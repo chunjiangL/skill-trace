@@ -1,0 +1,20 @@
+{
+  "name": "skill-trace",
+  "version": "0.1.4",
+  "description": "Shows local Codex skill activation dashboards.",
+  "skills": "./skills/",
+  "author": {
+    "name": "Skill Trace contributors"
+  },
+  "interface": {
+    "displayName": "Skill Trace",
+    "shortDescription": "Trace Codex skill activations.",
+    "longDescription": "Skill Trace scans local Codex session records and renders compact session/user skill activation dashboards.",
+    "developerName": "Skill Trace contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "skills"
+    ],
+    "defaultPrompt": "Show my skill activation dashboard."
+  }
+}

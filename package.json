@@ -1,0 +1,47 @@
+{
+  "name": "skill-trace",
+  "version": "0.1.4",
+  "description": "Local Codex skill activation dashboard plugin.",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/chunjiangL/skill-trace#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chunjiangL/skill-trace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chunjiangL/skill-trace/issues"
+  },
+  "keywords": [
+    "codex",
+    "plugin",
+    "skills",
+    "dashboard"
+  ],
+  "bin": {
+    "skill-trace": "./scripts/skill-trace.mjs"
+  },
+  "files": [
+    ".agents/",
+    ".codex-plugin/",
+    "scripts/install.mjs",
+    "scripts/skill-trace.mjs",
+    "scripts/skill-trace-dashboard.mjs",
+    "scripts/lib/env.mjs",
+    "scripts/lib/rollout-scan.mjs",
+    "scripts/lib/stats.mjs",
+    "skills/",
+    "install.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "for f in scripts/*.mjs scripts/lib/*.mjs; do node --check \"$f\" || exit 1; done",
+    "test": "node scripts/test-stats.mjs && node scripts/test-rollout-scan.mjs && node scripts/test-cli.mjs",
+    "install:local": "node scripts/install.mjs",
+    "dashboard": "node scripts/skill-trace-dashboard.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
