@@ -8,6 +8,13 @@ const RESET = "\x1b[0m";
 const BLOCK = "■";
 const SEPARATOR = "─";
 const MAX_BAR_UNITS = 18;
+const COLUMN_GAP = 4;
+const MIN_COLUMN_WIDTH = 44;
+const PERIODS = [
+  { key: "day", short: "D", label: "Daily" },
+  { key: "week", short: "W", label: "Weekly" },
+  { key: "month", short: "M", label: "Monthly" },
+];
 
 export function filterUsage(records, { since = "all", mode = "all", now = new Date() } = {}) {
   const cutoff = cutoffForSince(since, now);
@@ -57,6 +64,8 @@ export function renderDashboard(records, {
   sessionId = null,
   color = true,
   columns = 100,
+  diff = true,
+  layout = "auto",
   now = new Date(),
   sourceLabel = null,
 } = {}) {
@@ -64,6 +73,7 @@ export function renderDashboard(records, {
   const summary = summarizeModes(filtered);
   const lines = [];
   const scopes = normalizeScopes(scope);
+  const useColumns = shouldUseColumns({ columns, layout, diff });
 
   lines.push(`${text("Skill Trace", { color, bold: true })} ${text(`window=${since} mode=${mode}`, { color })}`);
   lines.push(separator(columns, { color }));
@@ -73,12 +83,15 @@ export function renderDashboard(records, {
   if (scopes.includes("session")) {
     const sessionRecords = sessionId ? filtered.filter((record) => record.thread_id === sessionId) : [];
     lines.push("");
-    lines.push(renderSection({
-      title: `Session ${sessionId ? shortId(sessionId) : "unavailable"}`,
+    lines.push(renderDashboardRow({
+      leftTitle: `Session ${sessionId ? shortId(sessionId) : "unavailable"}`,
       records: sessionRecords,
       limit,
       color,
       columns,
+      now,
+      diff,
+      useColumns,
       emptyMessage: sessionId
         ? "No skill activation records for this session in this window."
         : "No current session id found. Pass --session-id THREAD_ID.",
@@ -87,12 +100,15 @@ export function renderDashboard(records, {
 
   if (scopes.includes("user")) {
     lines.push("");
-    lines.push(renderSection({
-      title: "User Sessions",
+    lines.push(renderDashboardRow({
+      leftTitle: "User Sessions",
       records: filtered,
       limit,
       color,
       columns,
+      now,
+      diff,
+      useColumns,
       emptyMessage: "No skill activation records for this window.",
     }));
   }
@@ -121,8 +137,65 @@ export function cutoffForSince(since, now = new Date()) {
   throw new Error(`invalid --since value: ${since}`);
 }
 
+function shouldUseColumns({ columns, layout, diff }) {
+  if (!diff) return false;
+  if (layout === "stack") return false;
+  if (layout === "columns") return true;
+  if (layout !== "auto") throw new Error(`invalid --layout value: ${layout}`);
+  return columns >= MIN_COLUMN_WIDTH * 2 + COLUMN_GAP;
+}
+
+function renderDashboardRow({
+  leftTitle,
+  records,
+  limit,
+  color,
+  columns,
+  now,
+  diff,
+  useColumns,
+  emptyMessage,
+}) {
+  if (!diff) {
+    return renderSection({ title: leftTitle, records, limit, color, columns, emptyMessage });
+  }
+
+  const rows = aggregateBySkill(records).slice(0, limit);
+
+  if (!useColumns) {
+    return [
+      renderActivitySection({ title: leftTitle, records, rows, color, columns, emptyMessage }).join("\n"),
+      "",
+      renderDeltaSection({ records, rows, color, columns, now }).join("\n"),
+    ].join("\n");
+  }
+
+  const leftWidth = Math.floor((columns - COLUMN_GAP) / 2);
+  const rightWidth = columns - COLUMN_GAP - leftWidth;
+  const leftLines = renderActivitySection({
+    title: leftTitle,
+    records,
+    rows,
+    color,
+    columns: leftWidth,
+    emptyMessage,
+  });
+  const rightLines = renderDeltaSection({
+    records,
+    rows,
+    color,
+    columns: rightWidth,
+    now,
+  });
+  return joinColumns(leftLines, rightLines, leftWidth, COLUMN_GAP);
+}
+
 function renderSection({ title, records, limit, color, columns, emptyMessage }) {
   const rows = aggregateBySkill(records).slice(0, limit);
+  return renderActivitySection({ title, records, rows, color, columns, emptyMessage }).join("\n");
+}
+
+function renderActivitySection({ title, records, rows, color, columns, emptyMessage }) {
   const summary = summarizeModes(records);
   const skillWidth = Math.min(30, Math.max(10, ...rows.map((row) => row.skill.length)));
   const countWidth = Math.max(4, String(rows[0]?.total || 0).length);
@@ -136,8 +209,8 @@ function renderSection({ title, records, limit, color, columns, emptyMessage }) 
   lines.push(summaryLine(summary, { color }));
 
   if (rows.length === 0) {
-    lines.push(text(emptyMessage, { color }));
-    return lines.join("\n");
+    lines.push(text(truncate(emptyMessage, columns), { color }));
+    return lines;
   }
 
   for (const row of rows) {
@@ -155,10 +228,186 @@ function renderSection({ title, records, limit, color, columns, emptyMessage }) 
     lines.push(separator(columns, { color }));
     lines.push(text("Recent Activations", { color, bold: true }));
     for (const record of recent) {
-      lines.push(text(`${shortDateTime(record.ts)}  ${record.skill}`, { color }));
+      lines.push(text(truncate(`${shortDateTime(record.ts)}  ${record.skill}`, columns), { color }));
     }
   }
-  return lines.join("\n");
+  return lines;
+}
+
+function renderDeltaSection({ records, rows, color, columns, now }) {
+  const lines = [];
+  const metrics = deltaMetrics(records, now);
+  const rowMetrics = rows.map((row) => metrics.bySkill.get(row.skill) || emptyDelta());
+  const totalMaxByPeriod = maxDeltaByPeriod(metrics.total, []);
+  const rowMaxByPeriod = maxDeltaByPeriod(emptyDelta(), rowMetrics);
+  const layout = deltaColumnLayout(columns);
+
+  lines.push(deltaHeaderLine(layout, { color }));
+  lines.push(separator(columns, { color }));
+  lines.push(deltaTripletLine(metrics.total, totalMaxByPeriod, layout, { color, columns }));
+
+  if (rows.length === 0) {
+    lines.push(text("No skill diffs for this view.", { color }));
+    return lines;
+  }
+
+  for (const item of rowMetrics) {
+    lines.push(deltaTripletLine(item, rowMaxByPeriod, layout, { color, columns }));
+  }
+
+  lines.push(separator(columns, { color }));
+  lines.push(text("Total Diff", { color, bold: true }));
+  lines.push(deltaDetailLine(metrics.total, layout, { color, columns }));
+  return lines;
+}
+
+function deltaMetrics(records, now) {
+  const ranges = periodRanges(now);
+  const bySkill = new Map();
+  const total = emptyDelta();
+
+  for (const record of records) {
+    const ts = Date.parse(record.ts);
+    if (!Number.isFinite(ts)) continue;
+
+    const item = bySkill.get(record.skill) || emptyDelta();
+    let matched = false;
+    for (const period of PERIODS) {
+      const bucket = periodBucket(ts, ranges[period.key]);
+      if (!bucket) continue;
+      total[period.key][bucket] += 1;
+      item[period.key][bucket] += 1;
+      matched = true;
+    }
+    if (matched) bySkill.set(record.skill, item);
+  }
+
+  finalizeDelta(total);
+  for (const item of bySkill.values()) finalizeDelta(item);
+  return { total, bySkill };
+}
+
+function emptyDelta() {
+  return {
+    day: emptyPeriodDelta(),
+    week: emptyPeriodDelta(),
+    month: emptyPeriodDelta(),
+  };
+}
+
+function emptyPeriodDelta() {
+  return { current: 0, previous: 0, delta: 0 };
+}
+
+function finalizeDelta(item) {
+  for (const period of PERIODS) {
+    item[period.key].delta = item[period.key].current - item[period.key].previous;
+  }
+  return item;
+}
+
+function periodRanges(now) {
+  const dayStart = startOfLocalDay(now);
+  const weekStart = startOfLocalWeek(now);
+  const monthStart = startOfLocalMonth(now);
+  return {
+    day: {
+      currentStart: dayStart,
+      currentEnd: addDays(dayStart, 1),
+      previousStart: addDays(dayStart, -1),
+      previousEnd: dayStart,
+    },
+    week: {
+      currentStart: weekStart,
+      currentEnd: addDays(weekStart, 7),
+      previousStart: addDays(weekStart, -7),
+      previousEnd: weekStart,
+    },
+    month: {
+      currentStart: monthStart,
+      currentEnd: addMonths(monthStart, 1),
+      previousStart: addMonths(monthStart, -1),
+      previousEnd: monthStart,
+    },
+  };
+}
+
+function periodBucket(ts, range) {
+  if (ts >= range.currentStart.getTime() && ts < range.currentEnd.getTime()) return "current";
+  if (ts >= range.previousStart.getTime() && ts < range.previousEnd.getTime()) return "previous";
+  return null;
+}
+
+function maxDeltaByPeriod(total, items) {
+  const result = {};
+  for (const period of PERIODS) {
+    result[period.key] = Math.max(
+      1,
+      Math.abs(total[period.key].delta),
+      ...items.map((item) => Math.abs(item[period.key].delta)),
+    );
+  }
+  return result;
+}
+
+function deltaColumnLayout(columns) {
+  const gap = 2;
+  const width = Math.max(8, Math.floor((columns - gap * (PERIODS.length - 1)) / PERIODS.length));
+  return { gap, width, barWidth: Math.max(1, Math.min(5, width - 7)) };
+}
+
+function deltaHeaderLine(layout, { color }) {
+  return PERIODS
+    .map((period) => text(period.label.padEnd(layout.width, " "), { color, bold: true }))
+    .join(text(" ".repeat(layout.gap), { color }));
+}
+
+function deltaTripletLine(item, maxByPeriod, layout, { color, columns }) {
+  const pieces = PERIODS.map((period) => deltaCell(item[period.key], maxByPeriod[period.key], layout, { color }));
+  return truncateAnsi(pieces.join(text(" ".repeat(layout.gap), { color })), columns);
+}
+
+function deltaCell(item, maxDelta, layout, { color }) {
+  const value = formatDelta(item.delta);
+  const bar = deltaBar(item.delta, maxDelta, layout.barWidth, { color });
+  const visible = `${value}${bar ? " " : ""}${stripAnsi(bar)}`;
+  const padded = visible.padEnd(layout.width, " ");
+  if (!color) return padded;
+  const suffix = " ".repeat(Math.max(0, layout.width - visible.length));
+  return `${deltaText(value, item.delta, { color })}${bar ? deltaText(" ", item.delta, { color }) : ""}${bar}${text(suffix, { color })}`;
+}
+
+function deltaDetailLine(item, layout, { color, columns }) {
+  const pieces = PERIODS.map((period) => deltaDetailCell(item[period.key], layout, { color }));
+  return truncateAnsi(pieces.join(text(" ".repeat(layout.gap), { color })), columns);
+}
+
+function deltaDetailCell(item, layout, { color }) {
+  const value = `${item.previous}->${item.current} ${formatDelta(item.delta)}`;
+  const visible = truncate(value, layout.width).padEnd(layout.width, " ");
+  return deltaText(visible, item.delta, { color });
+}
+
+function deltaBar(delta, maxDelta, maxBarWidth, { color }) {
+  if (delta === 0) return "";
+  const barWidth = Math.max(1, maxBarWidth);
+  const barLength = Math.max(1, Math.round((Math.abs(delta) / maxDelta) * barWidth));
+  const tone = delta > 0 ? "implicit" : "explicit";
+  const value = BLOCK.repeat(barLength);
+  return color ? paint(value, { color, tone }) : value;
+}
+
+function deltaText(value, delta, { color }) {
+  if (!color) return value;
+  if (delta > 0) return paint(value, { color, tone: "implicit" });
+  if (delta < 0) return paint(value, { color, tone: "explicit" });
+  return text(value, { color });
+}
+
+function formatDelta(value) {
+  if (value > 0) return `+${value}`;
+  if (value < 0) return String(value);
+  return "0";
 }
 
 function summaryLine(summary, { color } = {}) {
@@ -224,6 +473,49 @@ function allocateSegmentLengths(segments, barLength, total) {
   return lengths;
 }
 
+function joinColumns(leftLines, rightLines, leftWidth, gap) {
+  const rows = [];
+  const count = Math.max(leftLines.length, rightLines.length);
+  const spacer = " ".repeat(gap);
+  for (let index = 0; index < count; index += 1) {
+    const left = leftLines[index] || "";
+    const right = rightLines[index] || "";
+    rows.push(`${padAnsiEnd(left, leftWidth)}${spacer}${right}`);
+  }
+  return rows.join("\n");
+}
+
+function padAnsiEnd(value, width) {
+  const visible = stripAnsi(value).length;
+  return visible >= width ? value : `${value}${" ".repeat(width - visible)}`;
+}
+
+function stripAnsi(value) {
+  return value.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+function startOfLocalDay(value) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function startOfLocalWeek(value) {
+  const day = startOfLocalDay(value);
+  const mondayOffset = (day.getDay() + 6) % 7;
+  return addDays(day, -mondayOffset);
+}
+
+function startOfLocalMonth(value) {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function addDays(value, days) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate() + days);
+}
+
+function addMonths(value, months) {
+  return new Date(value.getFullYear(), value.getMonth() + months, 1);
+}
+
 function shortId(value) {
   if (!value) return "unknown";
   return value.length > 14 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
@@ -245,6 +537,24 @@ function truncate(value, width) {
   if (value.length <= width) return value;
   if (width <= 1) return value.slice(0, width);
   return `${value.slice(0, width - 1)}…`;
+}
+
+function truncateAnsi(value, width) {
+  if (stripAnsi(value).length <= width) return value;
+  let visible = 0;
+  let output = "";
+  for (let index = 0; index < value.length && visible < Math.max(1, width - 1); index += 1) {
+    if (value[index] === "\x1b") {
+      const end = value.indexOf("m", index);
+      if (end === -1) break;
+      output += value.slice(index, end + 1);
+      index = end;
+      continue;
+    }
+    output += value[index];
+    visible += 1;
+  }
+  return `${output}…${RESET}`;
 }
 
 function separator(columns, { color } = {}) {

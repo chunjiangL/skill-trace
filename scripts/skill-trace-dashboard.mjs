@@ -34,6 +34,8 @@ function render() {
     sessionId: args.sessionId || process.env.CODEX_THREAD_ID || scanned.latestSessionId || null,
     color: args.color,
     columns: process.stdout.columns || 100,
+    diff: args.diff,
+    layout: args.layout,
     sourceLabel: args.verbose ? sourceLabel(scanned.records.length, scanned.filesScanned) : null,
   }));
   if (args.watch) process.stdout.write("\nCtrl-C to exit\n");
@@ -46,6 +48,8 @@ function parseArgs(argv) {
     scope: "both",
     limit: 12,
     color: defaultColor(),
+    diff: true,
+    layout: "auto",
     refreshMs: 1000,
     watch: false,
     scanFiles: 50,
@@ -65,6 +69,9 @@ function parseArgs(argv) {
     else if (arg === "--refresh-ms") parsed.refreshMs = parsePositiveInteger(argv[++i], "--refresh-ms");
     else if (arg === "--watch" || arg === "-w") parsed.watch = true;
     else if (arg === "--verbose" || arg === "-v") parsed.verbose = true;
+    else if (arg === "--diff") parsed.diff = true;
+    else if (arg === "--no-diff") parsed.diff = false;
+    else if (arg === "--layout") parsed.layout = parseChoice(argv[++i], "--layout", ["auto", "columns", "stack"]);
     else if (arg === "--color") parsed.color = true;
     else if (arg === "--no-color") parsed.color = false;
     else throw new Error(`unknown argument: ${arg}`);
@@ -78,8 +85,13 @@ function parsePositiveInteger(value, flag) {
   return parsed;
 }
 
+function parseChoice(value, flag, choices) {
+  if (!choices.includes(value)) throw new Error(`${flag} expects one of: ${choices.join(", ")}`);
+  return value;
+}
+
 function printUsage() {
-  process.stdout.write(`Usage: skill-trace dashboard [--since 24h|7d|all] [--mode all|implicit|explicit] [--scope both|session|user] [--session-id THREAD_ID] [--limit N] [--watch] [--verbose] [--color|--no-color]\n`);
+  process.stdout.write(`Usage: skill-trace dashboard [--since 24h|7d|all] [--mode all|implicit|explicit] [--scope both|session|user] [--session-id THREAD_ID] [--limit N] [--layout auto|columns|stack] [--diff|--no-diff] [--watch] [--verbose] [--color|--no-color]\n`);
 }
 
 function defaultColor() {

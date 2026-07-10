@@ -9,12 +9,13 @@ Run the local dashboard command and show its output directly:
 skill-trace dashboard --scope both
 ```
 
-If the user asks for a time window, mode, limit, or specific session/thread, pass the matching flags:
+If the user asks for a time window, mode, limit, diff display, or specific session/thread, pass the matching flags:
 
 - `--since 24h`, `--since 7d`, or `--since all`
 - `--mode all`, `--mode implicit`, or `--mode explicit`
 - `--limit N`
 - `--session-id THREAD_ID`
+- `--diff` or `--no-diff`
 
 If `skill-trace` is not on `PATH`, resolve the plugin root from this skill's path and run:
 

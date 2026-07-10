@@ -6,7 +6,7 @@ Unofficial Codex plugin and CLI for local skill activation dashboards.
 !skill-trace
 ```
 
-Skill Trace scans local Codex session records, counts skill activations, and renders compact session/user dashboards. It does not call a model or external API to render the dashboard.
+Skill Trace scans local Codex session records, counts skill activations, and renders compact session/user dashboards with daily, weekly, and monthly diffs. It does not call a model or external API to render the dashboard.
 
 ## Install
 
@@ -47,6 +47,7 @@ From a terminal:
 skill-trace
 skill-trace --since 24h
 skill-trace --scope session
+skill-trace --no-diff
 skill-trace --verbose
 ```
 

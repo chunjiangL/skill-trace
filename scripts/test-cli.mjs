@@ -30,6 +30,13 @@ assert.equal(help.status, 0, help.stderr);
 assert.match(help.stdout, /install\s+Install plugin and link the CLI/);
 assert.match(help.stdout, /dashboard, dash\s+Show skill activation frequency bars/);
 
+const dashboardHelp = spawnSync(process.execPath, ["scripts/skill-trace-dashboard.mjs", "--help"], {
+  encoding: "utf8",
+});
+assert.equal(dashboardHelp.status, 0, dashboardHelp.stderr);
+assert.match(dashboardHelp.stdout, /--layout auto\|columns\|stack/);
+assert.match(dashboardHelp.stdout, /--diff\|--no-diff/);
+
 const coloredDefault = spawnSync(process.execPath, baseArgs, {
   encoding: "utf8",
   env,
@@ -39,6 +46,12 @@ assert.match(coloredDefault.stdout, /^\x1b\[90m\x1b\[1mSkill Trace/);
 assert.match(coloredDefault.stdout, /\x1b\[90m/);
 assert.match(coloredDefault.stdout, /\x1b\[36m/);
 assert.match(coloredDefault.stdout, /■/);
+assert.match(coloredDefault.stdout, /Daily/);
+assert.match(coloredDefault.stdout, /Weekly/);
+assert.match(coloredDefault.stdout, /Monthly/);
+assert.doesNotMatch(coloredDefault.stdout, /Daily \/ Weekly/);
+assert.match(coloredDefault.stdout, /[+-]?\d+/);
+assert.doesNotMatch(coloredDefault.stdout, /yday/);
 assert.doesNotMatch(coloredDefault.stdout, /usage .*usage\.jsonl/);
 assert.match(coloredDefault.stdout, /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s{2}openai-docs/);
 
@@ -53,6 +66,7 @@ assert.match(colored.stdout, /\x1b\[36m/);
 assert.match(colored.stdout, /\x1b\[35m/);
 assert.match(colored.stdout, /\x1b\[90mtotal \d+\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[90m implicit/);
 assert.match(colored.stdout, /\x1b\[35m■\x1b\[0m\x1b\[90m explicit/);
+assert.match(colored.stdout, /\x1b\[36m\+2\x1b\[0m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[97m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[30m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[34m/);
@@ -79,6 +93,7 @@ const plain = spawnSync(process.execPath, [...baseArgs, "--no-color"], {
 assert.equal(plain.status, 0, plain.stderr);
 assert.doesNotMatch(plain.stdout, /\x1b\[/);
 assert.match(plain.stdout, /■/);
+assert.match(plain.stdout, /Daily\s+Weekly\s+Monthly/);
 assert.doesNotMatch(plain.stdout, /🔹/);
 assert.doesNotMatch(plain.stdout, /🟩/);
 

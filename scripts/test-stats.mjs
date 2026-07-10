@@ -43,10 +43,18 @@ const rendered = renderDashboard(records, {
 });
 assert.match(rendered, /Skill Trace/);
 assert.match(rendered, /Session thread-a/);
+assert.match(rendered, /Daily\s+Weekly\s+Monthly/);
 assert.match(rendered, /User Sessions/);
 assert.match(rendered, /─{24,}/);
 assert.match(rendered, /total 3\s+■ implicit 2\s+■ explicit 1/);
 assert.match(rendered, /openai-docs\s+2\s+■+/);
+assert.match(rendered, /\+2 ■+\s+\+2 ■+\s+\+2 ■+/);
+assert.match(rendered, /Total Diff/);
+assert.match(rendered, /0->2 \+2\s+0->2 \+2\s+0->2 \+2/);
+assert.doesNotMatch(rendered, /This Week/);
+assert.doesNotMatch(rendered, /D\/W\/M/);
+assert.doesNotMatch(rendered, /Daily \/ Weekly/);
+assert.doesNotMatch(rendered, /yday/);
 assert.doesNotMatch(rendered, /auto=/);
 assert.doesNotMatch(rendered, /manual=/);
 assert.doesNotMatch(rendered, /modes /);
@@ -61,6 +69,35 @@ assert.match(rendered, /Recent Activations/);
 assert.match(rendered, /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s{2}documents/);
 assert.doesNotMatch(rendered, /usage .*usage\.jsonl/);
 assert.doesNotMatch(rendered, /source .*session-scan/);
+
+const deltaRecords = [
+  ...records,
+  record("2026-07-08T05:20:00.000Z", "documents", "implicit"),
+  record("2026-07-08T05:25:00.000Z", "documents", "implicit"),
+];
+const columnsRendered = renderDashboard(deltaRecords, {
+  color: false,
+  since: "all",
+  sessionId: "thread-a",
+  columns: 140,
+  layout: "columns",
+  now: new Date("2026-07-09T06:00:00.000Z"),
+});
+assert.match(columnsRendered, /Session thread-a\s+Daily\s+Weekly\s+Monthly/);
+assert.match(columnsRendered, /User Sessions\s+Daily\s+Weekly\s+Monthly/);
+assert.match(columnsRendered, /\+1 ■+\s+\+5 ■+\s+\+5 ■+/);
+assert.match(columnsRendered, /-1 ■+\s+\+3 ■+\s+\+3 ■+/);
+assert.match(columnsRendered, /2->3 \+1\s+0->5 \+5\s+0->5 \+5/);
+
+const noHistoryRendered = renderDashboard(records, {
+  color: false,
+  since: "all",
+  sessionId: "thread-a",
+  columns: 140,
+  diff: false,
+  now: new Date("2026-07-09T06:00:00.000Z"),
+});
+assert.doesNotMatch(noHistoryRendered, /Daily\s+Weekly\s+Monthly/);
 
 const verboseRendered = renderDashboard(records, {
   color: false,
@@ -85,6 +122,7 @@ assert.match(colored, /\x1b\[35m/);
 assert.match(colored, /^\x1b\[90m\x1b\[1mSkill Trace/);
 assert.match(colored, /\x1b\[90mtotal 3\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[90m implicit 2/);
 assert.match(colored, /\x1b\[35m■\x1b\[0m\x1b\[90m explicit 1/);
+assert.match(colored, /\x1b\[36m\+2\x1b\[0m/);
 assert.doesNotMatch(colored, /\x1b\[97m/);
 assert.doesNotMatch(colored, /\x1b\[30m/);
 assert.doesNotMatch(colored, /\x1b\[34m/);
