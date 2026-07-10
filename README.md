@@ -10,28 +10,35 @@ Skill Trace scans local Codex session records, counts skill activations, and ren
 
 ## Install
 
-From a checkout:
+### From the Codex plugin browser
+
+Add this GitHub repo as a Codex marketplace once:
 
 ```bash
+codex plugin marketplace add chunjiangL/skill-trace
+```
+
+Then open Codex and install it from the plugin browser:
+
+```text
+/plugins
+```
+
+Search for `Skill Trace`, install it, then start a new Codex session.
+
+This installs the plugin and bundled skill. It does not link the `skill-trace` shell command.
+
+### Full local install
+
+Use this if you want the no-model dashboard command:
+
+```bash
+git clone https://github.com/chunjiangL/skill-trace.git
+cd skill-trace
 ./install.sh
 ```
 
-This installs the Codex plugin, links the `skill-trace` CLI, and verifies the command is available.
-
-If you only want the plugin from a configured marketplace:
-
-```bash
-codex plugin add skill-trace@skill-trace
-```
-
-For a new marketplace source:
-
-```bash
-codex plugin marketplace add <repo-url-or-owner/repo>
-codex plugin add skill-trace@skill-trace
-```
-
-Start a new Codex thread after installing or updating the plugin.
+This installs the Codex plugin, links the `skill-trace` CLI, and verifies that `skill-trace` is available.
 
 ## Usage
 
