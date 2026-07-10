@@ -46,7 +46,8 @@ assert.match(rendered, /Session thread-a/);
 assert.match(rendered, /Daily\s+Weekly\s+Monthly/);
 assert.match(rendered, /User Sessions/);
 assert.match(rendered, /─{24,}/);
-assert.match(rendered, /total 3\s+■ implicit 2\s+■ explicit 1/);
+assert.match(rendered, /total 3\s+■ implicit 2\s+■ explicit 1\s+■{18}/);
+assert.match(rendered, /total 3\s+■ 2\s+■ 1\s+■{18}/);
 assert.match(rendered, /openai-docs\s+2\s+■+/);
 assert.match(rendered, /\+2 ■+\s+\+2 ■+\s+\+2 ■+/);
 assert.match(rendered, /Total Diff/);
@@ -119,22 +120,43 @@ const colored = renderDashboard(records, {
 assert.match(colored, /\x1b\[90m/);
 assert.match(colored, /\x1b\[36m/);
 assert.match(colored, /\x1b\[35m/);
-assert.match(colored, /^\x1b\[90m\x1b\[1mSkill Trace/);
-assert.match(colored, /\x1b\[90mtotal 3\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[90m implicit 2/);
-assert.match(colored, /\x1b\[35m■\x1b\[0m\x1b\[90m explicit 1/);
-assert.match(colored, /\x1b\[36m\+2\x1b\[0m/);
-assert.doesNotMatch(colored, /\x1b\[97m/);
+assert.match(colored, /^\x1b\[97m\x1b\[1mSkill Trace/);
+assert.match(colored, /\x1b\[97mtotal 3\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[97m implicit 2\x1b\[0m/);
+assert.match(colored, /\x1b\[35m■\x1b\[0m\x1b\[97m explicit 1\x1b\[0m/);
+assert.match(colored, /\x1b\[97mtotal 2\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[97m 1\x1b\[0m\s+\x1b\[35m■\x1b\[0m\x1b\[97m 1\x1b\[0m/);
+assert.match(colored, /\x1b\[36m■{12}\x1b\[0m\x1b\[35m■{6}\x1b\[0m/);
+assert.match(colored, /\x1b\[92m\+2\x1b\[0m/);
 assert.doesNotMatch(colored, /\x1b\[30m/);
 assert.doesNotMatch(colored, /\x1b\[34m/);
 assert.doesNotMatch(colored, /\x1b\[94m/);
 assert.doesNotMatch(colored, /\x1b\[95m/);
-assert.doesNotMatch(colored, /\x1b\[92m/);
 assert.doesNotMatch(colored, /\x1b\[38;2;/);
 assert.doesNotMatch(colored, /\x1b\[38;5;16m/);
 assert.doesNotMatch(colored, /\x1b\[38;5;39m/);
 assert.doesNotMatch(colored, /\x1b\[32m/);
 assert.match(colored, /■/);
 assert.doesNotMatch(colored, /🔹/);
+
+const coloredDelta = renderDashboard(deltaRecords, {
+  color: true,
+  since: "all",
+  sessionId: "thread-a",
+  columns: 140,
+  layout: "columns",
+  now: new Date("2026-07-09T06:00:00.000Z"),
+});
+assert.match(coloredDelta, /\x1b\[91m-1\x1b\[0m/);
+
+const darkText = renderDashboard(records, {
+  color: true,
+  since: "all",
+  sessionId: "thread-a",
+  columns: 80,
+  now: new Date("2026-07-09T06:00:00.000Z"),
+  textTone: "dark",
+});
+assert.match(darkText, /^\x1b\[97m\x1b\[1mSkill Trace/);
+
 assert.equal(cutoffForSince("24h", new Date("2026-07-09T06:00:00.000Z")).toISOString(), "2026-07-08T06:00:00.000Z");
 assert.deepEqual(normalizeScopes("both"), ["session", "user"]);
 

@@ -42,7 +42,7 @@ const coloredDefault = spawnSync(process.execPath, baseArgs, {
   env,
 });
 assert.equal(coloredDefault.status, 0, coloredDefault.stderr);
-assert.match(coloredDefault.stdout, /^\x1b\[90m\x1b\[1mSkill Trace/);
+assert.match(coloredDefault.stdout, /^\x1b\[97m\x1b\[1mSkill Trace/);
 assert.match(coloredDefault.stdout, /\x1b\[90m/);
 assert.match(coloredDefault.stdout, /\x1b\[36m/);
 assert.match(coloredDefault.stdout, /■/);
@@ -60,24 +60,39 @@ const colored = spawnSync(process.execPath, [...baseArgs, "--color"], {
   env,
 });
 assert.equal(colored.status, 0, colored.stderr);
-assert.match(colored.stdout, /^\x1b\[90m\x1b\[1mSkill Trace/);
+assert.match(colored.stdout, /^\x1b\[97m\x1b\[1mSkill Trace/);
 assert.match(colored.stdout, /\x1b\[90m/);
 assert.match(colored.stdout, /\x1b\[36m/);
 assert.match(colored.stdout, /\x1b\[35m/);
-assert.match(colored.stdout, /\x1b\[90mtotal \d+\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[90m implicit/);
-assert.match(colored.stdout, /\x1b\[35m■\x1b\[0m\x1b\[90m explicit/);
-assert.match(colored.stdout, /\x1b\[36m\+2\x1b\[0m/);
-assert.doesNotMatch(colored.stdout, /\x1b\[97m/);
+assert.match(colored.stdout, /\x1b\[97mtotal \d+\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[97m implicit \d+\x1b\[0m/);
+assert.match(colored.stdout, /\x1b\[35m■\x1b\[0m\x1b\[97m explicit \d+\x1b\[0m/);
+assert.match(colored.stdout, /\x1b\[97mtotal \d+\x1b\[0m\s+\x1b\[36m■\x1b\[0m\x1b\[97m \d+\x1b\[0m/);
+assert.match(colored.stdout, /\x1b\[92m\+2\x1b\[0m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[30m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[34m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[94m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[95m/);
-assert.doesNotMatch(colored.stdout, /\x1b\[92m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[38;2;/);
 assert.doesNotMatch(colored.stdout, /\x1b\[38;5;16m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[38;5;39m/);
 assert.doesNotMatch(colored.stdout, /\x1b\[32m/);
 assert.match(colored.stdout, /■/);
+
+fs.writeFileSync(path.join(codexHome, "config.toml"), 'theme = "catppuccin-mocha"\n', "utf8");
+const darkTheme = spawnSync(process.execPath, [...baseArgs, "--color"], {
+  encoding: "utf8",
+  env,
+});
+assert.equal(darkTheme.status, 0, darkTheme.stderr);
+assert.match(darkTheme.stdout, /^\x1b\[97m\x1b\[1mSkill Trace/);
+
+fs.writeFileSync(path.join(codexHome, "config.toml"), 'theme = "catppuccin-latte"\n', "utf8");
+const lightTheme = spawnSync(process.execPath, [...baseArgs, "--color"], {
+  encoding: "utf8",
+  env,
+});
+assert.equal(lightTheme.status, 0, lightTheme.stderr);
+assert.match(lightTheme.stdout, /^\x1b\[90m\x1b\[1mSkill Trace/);
 
 const verbose = spawnSync(process.execPath, [...baseArgs, "--verbose"], {
   encoding: "utf8",

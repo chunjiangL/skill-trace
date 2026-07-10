@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { scanUsageFromRollouts } from "./lib/rollout-scan.mjs";
 import { renderDashboard } from "./lib/stats.mjs";
 
@@ -36,6 +39,7 @@ function render() {
     columns: process.stdout.columns || 100,
     diff: args.diff,
     layout: args.layout,
+    textTone: detectTextTone(),
     sourceLabel: args.verbose ? sourceLabel(scanned.records.length, scanned.filesScanned) : null,
   }));
   if (args.watch) process.stdout.write("\nCtrl-C to exit\n");
@@ -100,4 +104,27 @@ function defaultColor() {
 
 function sourceLabel(recordCount, filesScanned) {
   return `source ${recordCount} session-scan + ${filesScanned} files`;
+}
+
+function detectTextTone() {
+  const override = process.env.SKILL_TRACE_THEME?.trim().toLowerCase();
+  if (override === "dark" || override === "light") return override;
+
+  const theme = readCodexThemeName();
+  if (!theme) return "dark";
+  if (/(light|latte|day|dawn)/i.test(theme)) return "light";
+  if (/(dark|mocha|black|night|midnight|dracula|monokai|nord)/i.test(theme)) return "dark";
+  return "dark";
+}
+
+function readCodexThemeName() {
+  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const configPath = path.join(codexHome, "config.toml");
+  try {
+    const config = fs.readFileSync(configPath, "utf8");
+    const match = config.match(/^\s*theme\s*=\s*["']([^"']+)["']/m);
+    return match?.[1] || null;
+  } catch {
+    return null;
+  }
 }

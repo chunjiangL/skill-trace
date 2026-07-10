@@ -1,13 +1,17 @@
 const AUTO = "\x1b[36m";
-const TEXT = "\x1b[90m";
+const LIGHT_TEXT = "\x1b[90m";
+const DARK_TEXT = "\x1b[97m";
 const MANUAL = "\x1b[35m";
 const OTHER = "\x1b[35m";
+const DIFF_POSITIVE = "\x1b[92m";
+const DIFF_NEGATIVE = "\x1b[91m";
 const DIVIDER = "\x1b[90m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 const BLOCK = "■";
 const SEPARATOR = "─";
 const MAX_BAR_UNITS = 18;
+const SUMMARY_BAR_UNITS = 18;
 const COLUMN_GAP = 4;
 const MIN_COLUMN_WIDTH = 44;
 const PERIODS = [
@@ -68,7 +72,11 @@ export function renderDashboard(records, {
   layout = "auto",
   now = new Date(),
   sourceLabel = null,
+  textTone = "dark",
 } = {}) {
+  const previousText = activeText;
+  activeText = textTone === "dark" ? DARK_TEXT : LIGHT_TEXT;
+  try {
   const filtered = filterUsage(records, { since, mode, now });
   const summary = summarizeModes(filtered);
   const lines = [];
@@ -77,7 +85,7 @@ export function renderDashboard(records, {
 
   lines.push(`${text("Skill Trace", { color, bold: true })} ${text(`window=${since} mode=${mode}`, { color })}`);
   lines.push(separator(columns, { color }));
-  lines.push(summaryLine(summary, { color }));
+  lines.push(summaryLine(summary, { color, labels: true }));
   if (sourceLabel) lines.push(text(sourceLabel, { color }));
 
   if (scopes.includes("session")) {
@@ -114,6 +122,9 @@ export function renderDashboard(records, {
   }
 
   return `${lines.join("\n")}\n`;
+  } finally {
+    activeText = previousText;
+  }
 }
 
 export function normalizeScopes(scope) {
@@ -392,15 +403,15 @@ function deltaBar(delta, maxDelta, maxBarWidth, { color }) {
   if (delta === 0) return "";
   const barWidth = Math.max(1, maxBarWidth);
   const barLength = Math.max(1, Math.round((Math.abs(delta) / maxDelta) * barWidth));
-  const tone = delta > 0 ? "implicit" : "explicit";
+  const tone = delta > 0 ? "positive" : "negative";
   const value = BLOCK.repeat(barLength);
   return color ? paint(value, { color, tone }) : value;
 }
 
 function deltaText(value, delta, { color }) {
   if (!color) return value;
-  if (delta > 0) return paint(value, { color, tone: "implicit" });
-  if (delta < 0) return paint(value, { color, tone: "explicit" });
+  if (delta > 0) return paint(value, { color, tone: "positive" });
+  if (delta < 0) return paint(value, { color, tone: "negative" });
   return text(value, { color });
 }
 
@@ -410,13 +421,21 @@ function formatDelta(value) {
   return "0";
 }
 
-function summaryLine(summary, { color } = {}) {
-  return [
+function summaryLine(summary, { color, labels = false } = {}) {
+  const pieces = [
     text(`total ${summary.total}`, { color }),
-    `${modeMarker("implicit", { color })}${text(` implicit ${summary.implicit}`, { color })}`,
-    `${modeMarker("explicit", { color })}${text(` explicit ${summary.explicit}`, { color })}`,
-    summary.other ? text(`other ${summary.other}`, { color }) : null,
-  ].filter(Boolean).join("  ");
+    `${modeMarker("implicit", { color })}${text(labels ? ` implicit ${summary.implicit}` : ` ${summary.implicit}`, { color })}`,
+    `${modeMarker("explicit", { color })}${text(labels ? ` explicit ${summary.explicit}` : ` ${summary.explicit}`, { color })}`,
+    summary.other
+      ? `${modeMarker("other", { color })}${text(labels ? ` other ${summary.other}` : ` ${summary.other}`, { color })}`
+      : null,
+  ].filter(Boolean);
+
+  if (summary.total > 0) {
+    pieces.push(renderStackedBar(summary, SUMMARY_BAR_UNITS, { color }));
+  }
+
+  return pieces.join("  ");
 }
 
 function renderStackedBar(row, barLength, { color } = {}) {
@@ -440,6 +459,7 @@ function renderStackedBar(row, barLength, { color } = {}) {
 function modeMarker(mode, { color } = {}) {
   if (mode === "implicit") return color ? paint(BLOCK, { color, tone: "implicit" }) : BLOCK;
   if (mode === "explicit") return color ? paint(BLOCK, { color, tone: "explicit" }) : BLOCK;
+  if (mode === "other") return color ? paint(BLOCK, { color, tone: "other" }) : BLOCK;
   return BLOCK;
 }
 
@@ -564,7 +584,7 @@ function separator(columns, { color } = {}) {
 
 function text(value, { color, bold = false } = {}) {
   if (!color) return value;
-  const codes = [TEXT];
+  const codes = [activeText];
   if (bold) codes.push(BOLD);
   return `${codes.join("")}${value}${RESET}`;
 }
@@ -575,8 +595,12 @@ function paint(value, { color, tone = null, bold = false } = {}) {
   if (tone === "implicit") codes.push(AUTO);
   else if (tone === "explicit") codes.push(MANUAL);
   else if (tone === "other") codes.push(OTHER);
-  else codes.push(TEXT);
+  else if (tone === "positive") codes.push(DIFF_POSITIVE);
+  else if (tone === "negative") codes.push(DIFF_NEGATIVE);
+  else codes.push(activeText);
   if (bold) codes.push(BOLD);
   if (codes.length === 0) return value;
   return `${codes.join("")}${value}${RESET}`;
 }
+
+let activeText = LIGHT_TEXT;
